@@ -27,56 +27,11 @@ with open(COMMON_WORD_LIST) as infile:
 
 # constants used for comparing the output of a guess
 # we must guarantee that
-#       RIGHT_LETTER_AND_SPOT > RIGHT_LETTER > WRONG_LETTER
+#       RIGHT_LETTER_AND_SPOT > RIGHT_LETTER > WRONG_LETTER > UNTESTED
 RIGHT_LETTER_AND_SPOT = 2
 RIGHT_LETTER = 1
 WRONG_LETTER = 0
-
-
-## class Constraint():
-## 
-##     @staticmethod
-##     def from(right_word, guess):
-##         new = Constraint()
-## 
-##         comparison = compare(right_word, guess)
-## 
-##         # check for right letter, right spot
-##         for i in range(len(right_word)):
-##             if comparison[i] == RIGHT_LETTER_AND_SPOT:
-##                 # the right word must include that letter at that spot
-##                 new.includes.append( (right_word[i], i) )
-##             elif comparison[i] == RIGHT_LETTER:
-##                 # the right word must include that letter (at any position)
-##                 new.includes.append( (right_word[i], None) )
-##                 # but it can't include that letter at that spot
-##                 new.excludes.append( (right_word[i], i) )
-##             else:
-##                 # the right letter may not include that letter
-##                 new.excludes.append( (right_word[i], None) )
-##     @staticmethod
-##     def _predicate(predicate, word):
-##         letr, spot = predicate
-##         if spot is None:
-##             return letr in word
-##         else:
-##             return letr == word[spot]
-## 
-##     def __init__(self):
-##         """the empty constraint"""
-##         self.includes = []
-##         self.excludes = []
-## 
-##     def accepts(self, word):
-##         for pred in self.includes:
-##             if not Constraint._predicate(pred, word): return False
-## 
-##         for pred in self.excludes:
-##             if Constraint._predicate(pred, word): return False
-## 
-##         return True
-
-    
+UNTESTED = -1 
     
 def compare(right_word, guess):
     answer = [WRONG_LETTER for _ in right_word]
@@ -99,23 +54,26 @@ def compare(right_word, guess):
     return answer
 
 GREEN_YELLOW_COLOR_SCHEME = {
-    RIGHT_LETTER_AND_SPOT: '\033[32m',
-    RIGHT_LETTER: '\033[33m',
-    WRONG_LETTER: '\033[37m'
+    RIGHT_LETTER_AND_SPOT: '\033[32m',  # green
+    RIGHT_LETTER: '\033[33m',           # yellow
+    WRONG_LETTER: '\033[37m',           # white
+    UNTESTED: '\033[30m',               # black
 }
 RED_BLUE_COLOR_SCHEME = {
-    RIGHT_LETTER_AND_SPOT: '\033[31m',
-    RIGHT_LETTER: '\033[34m',
-    WRONG_LETTER: '\033[37m'
+    RIGHT_LETTER_AND_SPOT: '\033[31m',  # red
+    RIGHT_LETTER: '\033[34m',           # blue
+    WRONG_LETTER: '\033[37m',           # white
+    UNTESTED: '\033[30m',               # black
 }
 
 CLEAR_LINE = '\033[A\033[2K\r'
+RESET = '\033[0m'
 
 def colorize(word, comparison, scheme):
     s = ''
     for ch, x in zip(word, comparison):
         s += '%s%c' % (scheme[x], ch)
-    s += '\033[0m' # text reset
+    s += RESET
     return s
 
 def main():
@@ -142,42 +100,39 @@ def main():
     if '--riaz' in sys.argv:
         scheme = RED_BLUE_COLOR_SCHEME
 
-    print
+    print '%sRIGHT_LETTER_RIGHT_SPOT    %sRIGHT_LETTER%s' % (scheme[RIGHT_LETTER_AND_SPOT], scheme[RIGHT_LETTER], RESET)
 
     alphabet = "abcdefghijklmnopqrstuvwxyz"
-    alpha_tracker = [WRONG_LETTER for _ in alphabet]
+    alpha_tracker = [UNTESTED for _ in alphabet]
 
-    print colorize(alphabet, alpha_tracker, scheme)
-    print
-    print
+    lineno = 0 # this is how many line numbers we have to jump to get back to the alphabet
+    print 'Alpha: ' + colorize(alphabet, alpha_tracker, scheme=scheme); lineno += 1
+
+    print; lineno += 1
+
+    print 'Guesses: '; lineno += 1
 
     win = False
-    for i in range(6):
-        prefix = '[%d] ' % (i+3)
-        if REPLACE_LINE:
-            prefix = CLEAR_LINE + prefix
+    for guessno in range(1, 7):
+        prefix = '[%d] ' % guessno
 
-
+        # -------- get the guess ------------
         guess = ''
+        lineno += 1
         while True:
             guess = raw_input(prefix).strip().lower()
             if guess in wordset:
                 break
-            ## time.sleep(0.5)
+            print CLEAR_LINE,
 
         # use the guess to provide more info to the user
 
         comparison = compare(right_word, guess)
         colorized_guess = colorize(guess, comparison, scheme=scheme)
-        print '%s%s' % (prefix, colorized_guess)
-
+        print CLEAR_LINE + '%s%s' % (prefix, colorized_guess)
 
         # ---------------------------
         #  keep track of the alphabet printed on the first line
-
-        if REPLACE_LINE:
-            # move back to the top
-            print '\033[%dA' % (i+4)
 
         # update the alpha tracker to the information which conveys the most information
         for i,ch in enumerate(alphabet):
@@ -187,12 +142,13 @@ def main():
             if comparison[j] > alpha_tracker[i]:
                 alpha_tracker[i] = comparison[j]
 
-        # this moves us down 1
-        print colorize(alphabet, alpha_tracker, scheme=scheme)
-
         if REPLACE_LINE:
+            # move back to the top (NOTE: the lack of a newline here)
+            print '\033[%dA\r' % lineno,
+            # replace the line with the newly updated
+            print 'Alpha: %s' % colorize(alphabet, alpha_tracker, scheme=scheme),
             # move back to current row
-            print '\033[%dB' % (i+3)
+            print '\033[%dB\r' % lineno,
 
         # ----------------------------
 
@@ -200,13 +156,13 @@ def main():
         # Check for the winner
 
         if right_word == guess:
-            print 'Yay you got it!!!!'
             win = True
             break
 
-        print
 
-    if not win:
+    if win:
+        print 'Yay you got it!!!!'
+    else:
         print 'The word was \033[31m%s\033[0m. Better luck next time.' % right_word
 
     return win

@@ -1,57 +1,7 @@
-import time
-import random
+from core import *
 import sys
-from collections import Counter
-
-WORD_LIST = r'./words.txt'
-COMMON_WORD_LIST = r'./google-10000-english-usa.txt'
 
 REPLACE_LINE = True
-
-wordset = set()
-
-with open(WORD_LIST) as infile:
-    for line in infile:
-        w = line.strip().lower()
-        if len(w) != 5: continue
-        wordset.add(w)
-
-common_words = []
-
-with open(COMMON_WORD_LIST) as infile:
-    for line in infile:
-        w = line.strip().lower()
-        if len(w) != 5: continue
-        wordset.add(w)
-        common_words.append(w)
-
-# constants used for comparing the output of a guess
-# we must guarantee that
-#       RIGHT_LETTER_AND_SPOT > RIGHT_LETTER > WRONG_LETTER > UNTESTED
-RIGHT_LETTER_AND_SPOT = 2
-RIGHT_LETTER = 1
-WRONG_LETTER = 0
-UNTESTED = -1 
-    
-def compare(right_word, guess):
-    answer = [WRONG_LETTER for _ in right_word]
-    counter = Counter(right_word)
-
-    for i in range(len(right_word)):
-        if right_word[i] == guess[i]:
-            counter[guess[i]] -= 1
-            answer[i] = RIGHT_LETTER_AND_SPOT
-    
-    for i in range(len(right_word)):
-        if answer[i] == RIGHT_LETTER_AND_SPOT:
-            continue
-
-        ch = guess[i]
-        if counter[ch] > 0:
-            counter[ch] -= 1
-            answer[i] = RIGHT_LETTER
-
-    return answer
 
 GREEN_YELLOW_COLOR_SCHEME = {
     RIGHT_LETTER_AND_SPOT: '\033[32m',  # green
@@ -85,16 +35,7 @@ def main():
         print '   --pick=word  use word as the chosen word' 
         print '   --riaz       use the alternate color scheme'
 
-
-    choose_from = common_words
-    if '--hard' in sys.argv:
-        choose_from = tuple(wordset)
-
-    right_word = random.choice(choose_from)
-
-    for arg in sys.argv:
-        if arg.startswith('--pick='):
-            right_word = arg[len('--pick='):]
+    oracle = Oracle.from_args(sys.argv)
 
     scheme = GREEN_YELLOW_COLOR_SCHEME
     if '--riaz' in sys.argv:
@@ -121,13 +62,13 @@ def main():
         lineno += 1
         while True:
             guess = raw_input(prefix).strip().lower()
-            if guess in wordset:
+            if oracle.is_valid(guess):
                 break
             print CLEAR_LINE,
 
         # use the guess to provide more info to the user
 
-        comparison = compare(right_word, guess)
+        comparison = oracle.compare(guess)
         colorized_guess = colorize(guess, comparison, scheme=scheme)
         print CLEAR_LINE + '%s%s' % (prefix, colorized_guess)
 
@@ -155,7 +96,7 @@ def main():
 
         # Check for the winner
 
-        if right_word == guess:
+        if oracle.is_right(guess):
             win = True
             break
 
@@ -163,7 +104,7 @@ def main():
     if win:
         print 'Yay you got it!!!!'
     else:
-        print 'The word was \033[31m%s\033[0m. Better luck next time.' % right_word
+        print 'The word was \033[31m%s\033[0m. Better luck next time.' % oracle.right_word
 
     return win
 
